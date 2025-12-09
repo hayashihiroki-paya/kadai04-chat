@@ -1,10 +1,13 @@
-// firebase読み込み
+// -----------------------------
+// firebase読み込み設定
+// -----------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
     getFirestore,
     collection,
     addDoc,
     deleteDoc,
+    setDoc,
     doc,
     serverTimestamp,
     onSnapshot,
@@ -22,11 +25,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 固定値
-const constant = {
-    blockHorizontal: 5,
-    blockVertical: 3
-}
+// -----------------------------
+// 基本設定
+// -----------------------------
+const gridRows = 5;   // ブロックの行数
+const gridCols = 3;   // ブロックの列数
 
 // 管理用 データとしてサーバーにも載せるもの
 let barDataVertical = [];
@@ -34,6 +37,9 @@ let barDataHorizontal = [];
 let blockData = [];
 let currentPlayer = [true, false];
 let currentScore = [0, 0];
+// データを上書きして管理する方針に変更したのでidを保持しておく
+let dataID = "gameData";
+let playerID = "playerData";
 
 // プレイヤーが1番と2番それぞれどっちに着席しているか
 // 初期値falseで着席したらtrueに
@@ -43,75 +49,88 @@ let isPlayers = [false, false];
 let isEntry = [false, false];
 // playerの名前を記録して、相手の画面にも反映させる
 let playerName = ["", ""];
-
 // サーバ上の操作プレイヤーとローカル上で自分が着席してる情報が一致し例れば操作できるようにする
 // 判定用のboolean
 let isTurnPlayer = false;
+
 
 // ------------------------------
 // 画面の初期描画処理
 // ------------------------------
 
-// ブロック描画 横列ごとにグループ化して並べる 
 // $("#blockSpace").html()の中身を作成する
-let blockDataHtml = "";
-for (let i = 0; i < constant.blockVertical; i++) {
-    blockDataHtml += `<div class="blockHorizontalGroup">`;
-    for (let i2 = 0; i2 < constant.blockHorizontal; i2++) {
-        blockDataHtml += `<div class="block colorNotSelected"></div>`;
+// ブロックや縦横の棒の固定値
+const blockSize = 170;
+const barHThick = 20;
+const barVThick = 20;
+const margin = 20;
+// $("#blockSpace")のサイズをブロック数に合わせて設定して親要素の中央に
+// $("#blockSpace")要素の中にブロックと縦横の棒を描画していきます
+$("#blockSpace").css({
+    width: (blockSize + margin) * gridRows + margin,
+    height: (blockSize + margin) * gridCols + margin,
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)"
+});
+
+// ブロック描画
+// 左上から右、右端まで行ったら一列下を
+for (let r = 0; r < gridCols; r++) {
+
+    for (let c = 0; c < gridRows; c++) {
+        const block = $(`<div class="block colorNotSelected"></div>`);
         // ブロックの状態を管理
         blockData.push("notSelected");
+        // absolute配置 親要素は $("#blockSpace")
+        block.css({
+            position: "absolute",
+            top: r * (blockSize + margin) + margin,
+            left: c * (blockSize + margin) + margin,
+            width: blockSize,
+            height: blockSize,
+            border: "1px solid black"
+        });
+
+        $("#blockSpace").append(block);
     }
-    blockDataHtml += `</div>`;
 }
-$("#blockSpace").html(blockDataHtml);
+
 
 // 縦横それぞれのhtmlの中身を作成
-// ブロック数と列数行数で変動するので変数で計算
-const allBlockCount = constant.blockHorizontal * constant.blockVertical;
-let barHorizontalHtml = "";
-let barVerticalHtml = "";
-for (let i = 0; i < (allBlockCount + constant.blockHorizontal); i++) {
-    barHorizontalHtml += `<div class="barHorizontal colorNotSelected"></div>`;
-    barDataHorizontal[i] = "notSelected";
-}
-$("#barHorizontalGroup").html(barHorizontalHtml);
-for (let i = 0; i < (allBlockCount + constant.blockVertical); i++) {
-    barVerticalHtml += `<div class="barVertical colorNotSelected"></div>`;
-    barDataVertical[i] = "notSelected";
-}
-$("#barVerticalGroup").html(barVerticalHtml);
+// 横
+for (let r = 0; r < gridCols + 1; r++) {
 
-// 各ブロックの座標を獲得
-let blockPos = [];
-// ブロックの周囲を囲む縦横の棒の管理
-// 横向きの棒
-let barHorizontalPos = [];
-// 縦向きの棒
-let barVerticalPos = [];
-$(".block").each(function (e) {
-    // ブロックの座標を取得
-    blockPos[e] = $(this).offset();
-    $(this).html(`<p>${e}番目ブロック</p>`);
-    // 横向き棒の座標をブロック座標から計算して設定
-    // Object.assign({}, blockPos[e])じゃないと参照したオブジェクト情報書き換えちゃうらしい
-    barHorizontalPos[e] = Object.assign({}, blockPos[e]);
-    barHorizontalPos[e].top -= $(".barHorizontal").outerHeight();
-    barHorizontalPos[e + constant.blockHorizontal] = Object.assign({}, blockPos[e]);
-    barHorizontalPos[e + constant.blockHorizontal].top += $(".block").outerHeight();
-    // 縦向き
-    barVerticalPos[e + (Math.floor(e / constant.blockHorizontal))] = Object.assign({}, blockPos[e]);
-    barVerticalPos[e + (Math.floor(e / constant.blockHorizontal))].left -= $(".barVertical").outerWidth();
-    barVerticalPos[e + (Math.floor(e / constant.blockHorizontal)) + 1] = Object.assign({}, blockPos[e]);
-    barVerticalPos[e + (Math.floor(e / constant.blockHorizontal)) + 1].left += $(".block").outerWidth();
-});
-// 計算した座標に配置する
-$(".barHorizontal").each(function (e) {
-    $(this).offset(barHorizontalPos[e]);
-});
-$(".barVertical").each(function (e) {
-    $(this).offset(barVerticalPos[e]);
-});
+    for (let c = 0; c < gridRows; c++) {
+        const bar = $('<div class="barHorizontal colorNotSelected"></div>');
+        // absolute配置 親要素は $("#blockSpace")
+        bar.css({
+            top: r * (blockSize + margin),
+            left: c * (blockSize + margin) + margin,
+            width: blockSize,
+            height: barHThick
+        });
+
+        $("#blockSpace").append(bar);
+    }
+}
+// 縦
+for (let r = 0; r < gridCols; r++) {
+
+    for (let c = 0; c < gridRows + 1; c++) {
+        const bar = $('<div class="barVertical colorNotSelected"></div>');
+        // absolute配置 親要素は $("#blockSpace")
+        bar.css({
+            top: r * (blockSize + margin) + margin,
+            left: c * (blockSize + margin),
+            width: barVThick,
+            height: blockSize
+        });
+
+        $("#blockSpace").append(bar);
+    }
+}
+
 
 // ------------------------------
 // クリックされたときの動作
@@ -120,8 +139,8 @@ $(".barVertical").each(function (e) {
 // クリックされたときにクラスの付け替えで色を変える
 // あとからプレイヤーどっちの操作なのかで色など変更する
 // 横向きの処理
-$(".barHorizontal").on('click', function () {
-    // 捜査権限があるときだけ処理を行う
+$(".barHorizontal").on('click', async function () {
+    // このターンのプレイヤーであるときだけ処理を行う
     if (isTurnPlayer) {
         // 何番目が押されたかの判定
         const index = $(".barHorizontal").index(this);
@@ -151,16 +170,6 @@ $(".barHorizontal").on('click', function () {
                         currentPlayer[i] = true;
                     }
                 }
-            } else {
-                // 操作権残ってる＝得点してるということで得点処理
-                // for (let i = 0; i < isEntry.length; i++) {
-                //     // ローカルのプレイヤ番号がtrueの時同じ番号がtrueになってたということ
-                //     // 同じ番号のcurrentPlayerをfalseにする
-                //     // ローカルのプレイヤ番号がfalseの時同じ番号がtrueに変わることで相手の操作順に変わったということ
-                //     if (isEntry[i] === true) {
-                //         currentScore[i]++;
-                //     }
-                // }
             }
 
             // サーバーにアップロードするデータをまとめる
@@ -172,13 +181,13 @@ $(".barHorizontal").on('click', function () {
                 score: currentScore,
                 time: serverTimestamp()
             }
-            addDoc(collection(db, "data"), postData);
+            await setDoc(doc(db, "data", dataID), postData);
         }
     }
 });
 
 // 縦向きの処理
-$(".barVertical").on('click', function () {
+$(".barVertical").on('click', async function () {
     if (isTurnPlayer) {
         // 何番目が押されたかの判定
         const index = $(".barVertical").index(this);
@@ -206,18 +215,9 @@ $(".barVertical").on('click', function () {
                         currentPlayer[i] = true;
                     }
                 }
-            } else {
-                // 操作権残ってる＝得点してるということで得点処理
-                // ２マス同時に埋まることがあるのでブロックCheck関数に処理を移動します
-                // for (let i = 0; i < isEntry.length; i++) {
-                //     // ローカルのプレイヤ番号がtrueの時同じ番号がtrueになってたということ
-                //     // 同じ番号のcurrentPlayerをfalseにする
-                //     // ローカルのプレイヤ番号がfalseの時同じ番号がtrueに変わることで相手の操作順に変わったということ
-                //     if (isEntry[i] === true) {
-                //         currentScore[i]++;
-                //     }
-                // }
             }
+
+            // サーバーに送るデータを作成
             const postData = {
                 block: blockData,
                 horizontal: barDataHorizontal,
@@ -226,7 +226,8 @@ $(".barVertical").on('click', function () {
                 score: currentScore,
                 time: serverTimestamp()
             }
-            addDoc(collection(db, "data"), postData);
+            // データを上書き
+            await setDoc(doc(db, "data", dataID), postData);
         }
     }
 });
@@ -237,109 +238,64 @@ $(".barVertical").on('click', function () {
 
 // 離着席処理
 // entry
-$(".entryButton").on('click', function () {
+$(".entryButton").on('click', async function () {
+
+    // 押された着席のボタンの番号を取得
     const index = $(".entryButton").index(this);
+    
+    // 座席が未使用（isPlayers[index]がfalse）かつ、あなたがどっちにも座ってない（isEntryが全部false）とき
     if (!isPlayers[index] && isEntry.every(v => !v)) {
+        // どちらもtrueにして着席
         isEntry[index] = true;
         isPlayers[index] = true;
-        console.log("isPlayers[index]", isPlayers[index]);
+
+        // 着席ボタンと同じ親要素内のプレイヤーネームを表示する
         const parentBox = $(this).closest(".userInterfaceBox");
         playerName[index] = parentBox.find("input[type=text]").val();
         parentBox.find(".playerName").text(playerName[index]);
+
         // サーバーに情報保存
         const postData = {
             isPlayers: isPlayers,
             name: playerName,
             time: serverTimestamp()
         }
-        addDoc(collection(db, "players"), postData);
+        await setDoc(doc(db, "players", playerID), postData);
     }
 });
 
 // exit
-$(".exitButton").on('click', function () {
+$(".exitButton").on('click', async function () {
+
+    // 押された離席のボタンの番号を取得
     const index = $(".exitButton").index(this);
+
+    // 座席が使用中（isPlayers[index]がtrue）かつ、あなたの座席（isEntry[index]）が一致してるとき
     if (isPlayers[index] && isEntry[index]) {
+        // どちらもfalseにして離席したことになる
         isEntry[index] = false;
         isPlayers[index] = false;
-        console.log("isPlayers[index]", isPlayers[index]);
+
+        // 離席ボタンと同じ親要素内のプレイヤーネームを削除する
         const parentBox = $(this).closest(".userInterfaceBox");
         playerName[index] = "";
         parentBox.find(".playerName").text("");
+
         // サーバーに情報保存
         const postData = {
             isPlayers: isPlayers,
             name: playerName,
             time: serverTimestamp()
         }
-        addDoc(collection(db, "players"), postData);
+        await setDoc(doc(db, "players", playerID), postData);
     }
 });
 
 // リセットボタン操作
-// いったん$("#common")をリセットボタンとする
-$("#common").on('click', function () {
+$("#resetButton").on('click', function () {
     // すべてのデータを初期値に戻して上書きする処理を、ゲーム終了時にも動作させるので
     // 内部処理を全部関数にまとめました
     gameReset();
-
-    // // サーバーに全部初期値のデータを保存すると最新データがリセットされたことになる
-    // // 全部初期値にする
-    // // ブロック関係の情報
-    // for (let i = 0; i < blockData.length; i++) {
-    //     blockData[i] = "notSelected";
-    // }
-    // for (let i = 0; i < barDataHorizontal.length; i++) {
-    //     barDataHorizontal[i] = "notSelected";
-    // }
-    // for (let i = 0; i < barDataVertical.length; i++) {
-    //     barDataVertical[i] = "notSelected";
-    // }
-    // for (let i = 0; i < currentScore.length; i++) {
-    //     currentScore[i] = 0;
-    // }
-    // $(".block").each(function (e) {
-    //     $(this).removeClass("colorSelectedPlayer1");
-    //     $(this).removeClass("colorSelectedPlayer2");
-    //     $(this).addClass("colorNotSelected");
-    // });
-    // $(".barHorizontal").each(function (e) {
-    //     $(this).removeClass("colorSelectedPlayer1");
-    //     $(this).removeClass("colorSelectedPlayer2");
-    //     $(this).addClass("colorNotSelected");
-    // });
-    // $(".barVertical").each(function (e) {
-    //     $(this).removeClass("colorSelectedPlayer1");
-    //     $(this).removeClass("colorSelectedPlayer2");
-    //     $(this).addClass("colorNotSelected");
-    // });
-    // console.log("すべてのブロックと棒をnotSelectedに変更してカラークラスも変更");
-    // const postData = {
-    //     block: blockData,
-    //     horizontal: barDataHorizontal,
-    //     vertical: barDataVertical,
-    //     turnPlayer: currentPlayer,
-    //     score: currentScore,
-    //     time: serverTimestamp()
-    // }
-    // addDoc(collection(db, "data"), postData);
-    // // プレイヤー関係の情報
-    // for (let i = 0; i < isPlayers.length; i++) {
-    //     isPlayers[i] = false;
-    //     // ついでにローカルプレイヤーの着席判定も消しちゃう
-    //     isEntry[i] = false;
-    // }
-    // // 表示をリセット
-    // $(".playerName").each(function (e) {
-    //     $(this).text('');
-    //     playerName[e] = "";
-    // })
-    // const postPlayerData = {
-    //     isPlayers: isPlayers,
-    //     name: playerName,
-    //     time: serverTimestamp()
-    // }
-    // addDoc(collection(db, "players"), postPlayerData);
 })
 
 // ------------------------------
@@ -350,17 +306,14 @@ const q = query(collection(db, "data"), orderBy("time", "desc"));
 onSnapshot(q, (querySnapshot) => {
     // firestore 形式のデータである querySnapshot.docs を入力する
     const documents = dataDocuments(querySnapshot.docs);
-    // 古いデータ消す
-    for (let i = 1; i < documents.length; i++) {
-        deleteDoc(doc(db, "data", documents[i].id));
-    }
-    console.log(documents);
+
     // 各種配列を持ってきたデータに上書きする
     blockData = documents[0].data.block;
     barDataHorizontal = documents[0].data.horizontal;
     barDataVertical = documents[0].data.vertical;
     currentPlayer = documents[0].data.turnPlayer;
     currentScore = documents[0].data.score;
+
     // 描画処理 色変更を行う
     $(".block").each(function (e) {
         if (blockData[e] === "notSelected") {
@@ -405,8 +358,13 @@ onSnapshot(q, (querySnapshot) => {
         $(this).text(currentScore[e]);
     });
 
-    console.log("currentPlayer", currentPlayer);
-    console.log("isEntry", isEntry);
+    // ここでcss操作で背景色つける
+    $(".gameMainWindow").removeClass("colorSelectedPlayer1");
+    $(".gameMainWindow").removeClass("colorSelectedPlayer2");
+    const color = paintColor(currentPlayer);
+    $(".gameMainWindow").addClass(color);
+
+    // このターンのプレイヤーがどっちかを判定、このブラウザを開いているほうか判定
     if (currentPlayer[0] === isEntry[0] && currentPlayer[1] === isEntry[1]) {
         isTurnPlayer = true;
     } else {
@@ -417,10 +375,11 @@ onSnapshot(q, (querySnapshot) => {
             $(".currentPlayerName").text(playerName[i])
         }
     }
-    console.log("isTurnPlayer", isTurnPlayer);
 
     // スコアの合計点が最大値ならゲーム終了の処理
     const sumScore = currentScore[0] + currentScore[1];
+    // ブロック数と列数行数で変動するので変数で計算
+    const allBlockCount = gridRows * gridCols;
     if (sumScore === allBlockCount) {
         // 得点の大きいほうが勝者として表示される
         if (currentScore[0] > currentScore[1]) {
@@ -436,45 +395,45 @@ onSnapshot(q, (querySnapshot) => {
 // プレイヤーの情報が更新されたとき
 const qPlayers = query(collection(db, "players"), orderBy("time", "desc"));
 onSnapshot(qPlayers, (querySnapshot) => {
+
     // firestore 形式のデータである querySnapshot.docs を入力する
     const documents = dataDocuments(querySnapshot.docs);
-    // 古いデータ消す
-    for (let i = 1; i < documents.length; i++) {
-        deleteDoc(doc(db, "players", documents[i].id));
-    }
-    console.log(documents);
     isPlayers = documents[0].data.isPlayers;
     playerName = documents[0].data.name;
     $(".playerName").each(function (e) {
         $(this).text(playerName[e]);
     });
+
     // 操作順番がどちらなのかを判定
     // currentPlayer はサーバーから持ってきた情報[true,false]のように二つある
     // isEntry はローカルでプレイヤー0番か1番どっちに座ってるかでこちらも[true,false]
     // まったく一緒なら操作順番がこのブラウザーで開いてる側の人だと確定する
-    console.log("currentPlayer", currentPlayer);
-    console.log("isEntry", isEntry);
     if (currentPlayer[0] === isEntry[0] && currentPlayer[1] === isEntry[1]) {
         isTurnPlayer = true;
     } else {
         isTurnPlayer = false;
+    }
+
+    // ターンプレイヤーに応じて背景色変更
+    if (currentPlayer[0]) {
+        $(".gameMainWindow").removeClass("colorSelectedPlayer2");
+        $(".gameMainWindow").addClass("colorSelectedPlayer1");
+    } else {
+        $(".gameMainWindow").removeClass("colorSelectedPlayer1");
+        $(".gameMainWindow").addClass("colorSelectedPlayer2");
     }
     for (let i = 0; i < isEntry.length; i++) {
         if (currentPlayer[i] === true) {
             $(".currentPlayerName").text(playerName[i])
         }
     }
-    console.log("isTurnPlayer", isTurnPlayer);
 });
 
 // ゲーム終了時に出るWindowをクリックしたときの処理
 // 情報リセットして念のため画面更新
-$("#popupWindow").on('click', function () {
-    gameReset();
-    // resetが早すぎるとデータのクリアが間に合わないのかもということで遅らせます
-    setTimeout(function () {
-        location.reload();
-    }, 2000)
+$("#popupWindow").on('click', async function () {
+    await gameReset();
+    location.reload();
 })
 
 
@@ -499,7 +458,6 @@ function dataDocuments(fireStoreDocs) {
 // barをクリックしたときのみ動作する isTurnPlayerがtrue の時のみ処理されることになるので
 // 返り値でisTurnPlayerにtrueかfalseを入れなおす処理に変更します
 function blockCheck() {
-    console.log("blockCheck()処理");
     let returnBoolean = false;
     for (let i = 0; i < blockData.length; i++) {
         // ブロックを全部チェックしていく
@@ -507,9 +465,9 @@ function blockCheck() {
         // 上 i,下 i+5,左 i+(i/5の整数部分),右 i+(i/5の整数部分)+1
         const index = {
             top: i,
-            bottom: i + constant.blockHorizontal,
-            left: i + (Math.floor(i / constant.blockHorizontal)),
-            right: i + (Math.floor(i / constant.blockHorizontal)) + 1
+            bottom: i + gridRows,
+            left: i + (Math.floor(i / gridRows)),
+            right: i + (Math.floor(i / gridRows)) + 1
         }
         // ブロックがまだ変化してないところだけチェックする
         if (blockData[i] === "notSelected") {
@@ -524,13 +482,13 @@ function blockCheck() {
                 } else {
                     currentScore[1]++;
                 }
-                console.log("blockData[i]が'selectedPlayer1', 'selectedPlayer2'に変更されました i:" + i);
                 // 新しくブロックに色が付いた時は引き続き操作できる
                 returnBoolean = true;
             }
         }
     }
-    console.log("すべてのブロックをチェック終了");
+
+    // ブロックの状態を調べて色を付ける
     $(".block").each(function (e) {
         if (blockData[e] !== "notSelected") {
             $(this).removeClass("colorNotSelected");
@@ -539,9 +497,9 @@ function blockCheck() {
             } else if (blockData[e] === "selectedPlayer2") {
                 $(this).addClass("colorSelectedPlayer2");
             }
-            console.log("ブロックNo:" + e + " 番目のカラー変更");
         }
     });
+
     // ブロック更新が入ってたらtrue,更新がなければfalseで返す
     return returnBoolean;
 }
@@ -555,6 +513,7 @@ function paintColor(arrayBoolean) {
         }
     }
 }
+
 // プレイヤーの着席情報からどちらのプレイヤーに選ばれたかを判定し、管理用のテキストデータで返す
 function selectPlayerCheck(arrayBoolean) {
     const selectText = ["selectedPlayer1", "selectedPlayer2"]
@@ -567,7 +526,7 @@ function selectPlayerCheck(arrayBoolean) {
 
 // 各種情報をリセットして最初からに戻す処理
 // リセットボタンクリック時と、ゲームクリア時に行います
-function gameReset() {
+async function gameReset() {
     // サーバーに全部初期値のデータを保存すると最新データがリセットされたことになる
     // 全部初期値にする
     // ブロック関係の情報
@@ -583,6 +542,8 @@ function gameReset() {
     for (let i = 0; i < currentScore.length; i++) {
         currentScore[i] = 0;
     }
+
+    // カラー情報を初期化
     $(".block").each(function (e) {
         $(this).removeClass("colorSelectedPlayer1");
         $(this).removeClass("colorSelectedPlayer2");
@@ -598,7 +559,8 @@ function gameReset() {
         $(this).removeClass("colorSelectedPlayer2");
         $(this).addClass("colorNotSelected");
     });
-    console.log("すべてのブロックと棒をnotSelectedに変更してカラークラスも変更");
+
+    // サーバーに送るデータを整理
     const postData = {
         block: blockData,
         horizontal: barDataHorizontal,
@@ -607,22 +569,26 @@ function gameReset() {
         score: currentScore,
         time: serverTimestamp()
     }
-    addDoc(collection(db, "data"), postData);
+    await setDoc(doc(db, "data", dataID), postData);
+
     // プレイヤー関係の情報
     for (let i = 0; i < isPlayers.length; i++) {
         isPlayers[i] = false;
         // ついでにローカルプレイヤーの着席判定も消しちゃう
         isEntry[i] = false;
     }
+
     // 表示をリセット
     $(".playerName").each(function (e) {
         $(this).text('');
         playerName[e] = "";
     })
+
+    // サーバーに送るデータ整理
     const postPlayerData = {
         isPlayers: isPlayers,
         name: playerName,
         time: serverTimestamp()
     }
-    addDoc(collection(db, "players"), postPlayerData);
+    await setDoc(doc(db, "players", playerID), postPlayerData);
 }
