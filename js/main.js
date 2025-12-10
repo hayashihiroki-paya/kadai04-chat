@@ -52,6 +52,8 @@ let playerName = ["", ""];
 // サーバ上の操作プレイヤーとローカル上で自分が着席してる情報が一致し例れば操作できるようにする
 // 判定用のboolean
 let isTurnPlayer = false;
+// サーバー経由で相手がリセットボタン押したときを判定するためのフラグ
+let isReset = false;
 
 
 // ------------------------------
@@ -242,7 +244,7 @@ $(".entryButton").on('click', async function () {
 
     // 押された着席のボタンの番号を取得
     const index = $(".entryButton").index(this);
-    
+
     // 座席が未使用（isPlayers[index]がfalse）かつ、あなたがどっちにも座ってない（isEntryが全部false）とき
     if (!isPlayers[index] && isEntry.every(v => !v)) {
         // どちらもtrueにして着席
@@ -384,7 +386,7 @@ onSnapshot(q, (querySnapshot) => {
         // 得点の大きいほうが勝者として表示される
         if (currentScore[0] > currentScore[1]) {
             $("#popupWindow").css('display', 'block');
-            $("#winnersName").text(playerName[0]);
+            $(".winnersName").text(playerName[0]);
         } else {
             $("#popupWindow").css('display', 'block');
             $(".winnersName").text(playerName[1]);
@@ -432,6 +434,7 @@ onSnapshot(qPlayers, (querySnapshot) => {
 // ゲーム終了時に出るWindowをクリックしたときの処理
 // 情報リセットして念のため画面更新
 $("#popupWindow").on('click', async function () {
+    $("#popupWindow").css('display', 'none');
     await gameReset();
     location.reload();
 })
