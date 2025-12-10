@@ -3,9 +3,17 @@
 }
 
 #wrapper {
+    position: relative;
     width: 100%;
     height: 100vh;
     border: solid 1px lightgray;
+    background-image: url(../img/wood-texture_00031.jpg);
+    background-size: cover;
+}
+
+#logo {
+    position: absolute;
+    width: 200px;
 }
 
 .mainWindow {
@@ -37,6 +45,7 @@
     height: 80%;
     width: 95%;
     border: solid 1px black;
+    font-size: 20px;
 }
 
 .blockSpace {
@@ -132,13 +141,15 @@
 
 #popupWindow {
     position: absolute;
+    font-size: 60px;
+    text-align: center;
     top: 50%;
     left: 50%;
-    width: 50%;
+    width: 90%;
     height: 50%;
     transform: translate(-50%, -50%);
     background-color: lightslategrey;
-    opacity: 0.5;
+    opacity: 0.9;
     border: solid 1px black;
     display: none;
 }
@@ -146,3 +157,10 @@
 .currentPlayerName {
     font-size: 40px;
 }
+
+#common,
+#other,
+#mainWindow {
+    background-color: #fff;
+}
+
