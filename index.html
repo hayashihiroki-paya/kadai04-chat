@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ドットアンドボックス</title>
+    <!--jQueryを読み込み-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!--jQuery UIを読み込み-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet"
+        href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/ui-darkness/jquery-ui.css">
+    <link rel="stylesheet" href="./css/reset.css">
+    <link rel="stylesheet" href="./css/main.css">
+</head>
+
+<body>
+
+    <div id="wrapper">
+        <!-- <img id="logo" src="./img/logo_square.png" alt="titleLogo"> -->
+        <div id="mainWindow" class="mainWindow">
+            <div class="userInterfaceWindow">
+                <div id="common" class="userInterfaceBox">
+                    <p>リセットボタンです！クリック注意</p>
+                    <button id="resetButton">リセットする</button>
+                </div>
+                <div id="user01" class="userInterfaceBox">
+                    <input type="text" value="プレイヤー１">
+                    <button class="entryButton">着席</button>
+                    <button class="exitButton">離席</button>
+                    <p class="playerName"></p>
+                    <p><span class="playerScore"></span>点</p>
+                </div>
+                <div id="user02" class="userInterfaceBox">
+                    <input type="text" value="プレイヤー２">
+                    <button class="entryButton">着席</button>
+                    <button class="exitButton">離席</button>
+                    <p class="playerName"></p>
+                    <p><span class="playerScore"></span>点</p>
+                </div>
+                <div id="other" class="userInterfaceBox">
+                    <p>現在の操作プレイヤー</p>
+                    <p class="currentPlayerName"></p>
+                </div>
+            </div>
+            <div id="gameMainWindow" class="gameMainWindow">
+                <p>遊び方：１本ずつ交互に線を引いていき、正方形を作ったときのプレイヤーに得点が入ります</p>
+                <p>正方形が完成したときは続けて線を引くことができます</p>
+                <p>※動作がおかしい時はリセットボタンを押してからページを読み込みなおしてください・・・</p>
+                <div id="blockSpace" class="blockSpace"></div>
+                <div id="barHorizontalGroup"></div>
+                <div id="barVerticalGroup"></div>
+                <div id="popupWindow">
+                    <p>ゲーム終了！</p>
+                    <p>勝者【<span class="winnersName"></span>】！！！</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+
+</html>
